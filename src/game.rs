@@ -1,5 +1,6 @@
 use crate::tiles::*;
 use crate::pieces::*;
+use crate::input::*;
 use std::time::Instant;
 use std::io::Stdout;
 use std::ops::Index;
@@ -14,12 +15,13 @@ pub struct MapTile {
     pub is_set: bool,
 }
 
-pub struct Game {
+pub struct Game<TInput: InputSource> {
     pub map: Map,
-    pub current_piece: Piece,
+    pub falling_piece: Piece,
     pub last_move_instant: Instant,
     pub ended: bool,
-    pub stdout: Stdout,
+    pub input: TInput,
+    pub stdout: Stdout
 }
 
 pub struct Map {
@@ -33,13 +35,14 @@ impl Index<Tile> for Map {
     }
 }
 
-pub fn initialize_game() -> Game {
+pub fn initialize_game<TInput: InputSource>(input: TInput) -> Game<TInput> {
     Game {
         map: initialize_map(),
-        current_piece: create_piece(),
+        falling_piece: create_piece(),
         last_move_instant: Instant::now(),
         stdout: stdout(),
         ended: false,
+        input
     }
 }
 
