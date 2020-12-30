@@ -15,13 +15,17 @@ pub struct MapTile {
 }
 
 pub struct Game<TInput: InputSource, TPTS: PieceTypeSelector> {
-    pub map: Map,
-    pub falling_piece: Piece,
+    pub state: GameState,
     pub last_move_instant: Instant,
     pub ended: bool,
     pub input: TInput,
     pub piece_type_selector: TPTS,
     pub stdout: Stdout
+}
+
+pub struct GameState {
+    pub falling_piece: Piece,
+    pub map: Map
 }
 
 pub struct Map {

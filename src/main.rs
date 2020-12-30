@@ -23,15 +23,14 @@ fn main() {
     }
 }
 
-// random
 // render
 // time
 
 fn play<I: InputSource, PTS: PieceTypeSelector>(input: I, piece_type_selector: PTS) -> bool {
     let mut game = Game::initialize_game(input, piece_type_selector);
     draw_bounds(&mut game.stdout).unwrap();
-    draw_tiles(&mut game.stdout, &game.map).unwrap();
-    redraw_piece(&mut game.stdout, &game.falling_piece);
+    draw_tiles(&mut game.stdout, &game.state.map).unwrap();
+    redraw_piece(&mut game.stdout, &game.state.falling_piece);
     flush(&mut game.stdout);
 
     loop {
@@ -56,8 +55,10 @@ fn play<I: InputSource, PTS: PieceTypeSelector>(input: I, piece_type_selector: P
 impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
     pub fn initialize_game(input: I, piece_type_selector: PTS) -> Game<I, PTS> {
         Game {
-            map: Game::<I, PTS>::initialize_map(),
-            falling_piece: Game::<I, PTS>::create_piece(&piece_type_selector),
+            state: GameState {
+                map: Game::<I, PTS>::initialize_map(),
+                falling_piece: Game::<I, PTS>::create_piece(&piece_type_selector),
+            },
             last_move_instant: Instant::now(),
             stdout: stdout(),
             ended: false,
@@ -108,43 +109,15 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
     }
 
     fn move_left(&mut self) {
-        if self.can_move_left() {
+        if can_move_left(&mut self.state) {
             self.move_piece(Tile::new(-1, 0));
         }
     }
 
-    fn can_move_left(&self) -> bool {
-        for tile in &self.falling_piece.tiles {
-            if tile.x == 0 {
-                return false;
-            }
-
-            if self.map[*tile + Tile::new(-1, 0)].is_set {
-                return false;
-            }
-        }
-
-        true
-    }
-
     fn move_right(&mut self) {
-        if self.can_move_right() {
+        if can_move_right(&mut self.state) {
             self.move_piece(Tile::new(1, 0));
         }
-    }
-
-    fn can_move_right(&self) -> bool {
-        for tile in &self.falling_piece.tiles {
-            if tile.x + 1 >= WIDTH as i16 {
-                return false;
-            }
-
-            if self.map[*tile + Tile::new(1, 0)].is_set {
-                return false;
-            }
-        }
-
-        true
     }
 
     fn apply_gravity(&mut self) {
@@ -155,21 +128,21 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
 
     fn fall_piece(&mut self) {
         if !self.can_move_down() {
-            for tile in &mut self.falling_piece.tiles {
-                self.map.tiles[tile.x as usize][tile.y as usize].is_set = true;
+            for tile in &mut self.state.falling_piece.tiles {
+                self.state.map.tiles[tile.x as usize][tile.y as usize].is_set = true;
             }
 
             self.clear_complete_lines();
 
-            self.falling_piece = Game::<I, PTS>::create_piece(&self.piece_type_selector);
-            if !self.are_valid_positions(&self.falling_piece.tiles) {
+            self.state.falling_piece = Game::<I, PTS>::create_piece(&self.piece_type_selector);
+            if !are_valid_positions(&self.state.map, &self.state.falling_piece.tiles) {
                 self.ended = true;
                 return;
             }
 
             self.last_move_instant = Instant::now();
-            draw_tiles(&mut self.stdout, &self.map).unwrap();
-            redraw_piece(&mut self.stdout, &self.falling_piece);
+            draw_tiles(&mut self.stdout, &self.state.map).unwrap();
+            redraw_piece(&mut self.stdout, &self.state.falling_piece);
             return;
         }
 
@@ -181,7 +154,7 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
         for i in 0..HEIGHT as usize {
             let mut all_set = true;
             for x in 0..WIDTH as usize {
-                if !self.map.tiles[x][i].is_set {
+                if !self.state.map.tiles[x][i].is_set {
                     all_set = false;
                     break;
                 }
@@ -196,118 +169,71 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
     fn clear_line(&mut self, line_index: usize) {
         for i in (1..=line_index).rev() {
             for x in 0..WIDTH as usize {
-                self.map.tiles[x][i].is_set = self.map.tiles[x][i - 1].is_set;
+                self.state.map.tiles[x][i].is_set = self.state.map.tiles[x][i - 1].is_set;
             }
         }
 
         for x in 0..WIDTH as usize {
-            self.map.tiles[x][0].is_set = false;
+            self.state.map.tiles[x][0].is_set = false;
         }
     }
 
     fn try_rotate_clockwise(&mut self) {
-        let mut rotated_piece = self.falling_piece.clone();
+        let mut rotated_piece = self.state.falling_piece.clone();
         rotate_clockwise(&mut rotated_piece);
 
-        if !self.are_valid_positions(&rotated_piece.tiles) {
+        if !are_valid_positions(&self.state.map, &rotated_piece.tiles) {
             if !self.kick_piece(&rotated_piece, 0) {
                 return;
             }
         }
 
-        erase_piece(&mut self.stdout, &self.falling_piece);
-        self.falling_piece = rotated_piece;
-        redraw_piece(&mut self.stdout, &self.falling_piece);
+        erase_piece(&mut self.stdout, &self.state.falling_piece);
+        self.state.falling_piece = rotated_piece;
+        redraw_piece(&mut self.stdout, &self.state.falling_piece);
     }
 
     fn try_rotate_counterclockwise(&mut self) {
-        let mut rotated_piece = self.falling_piece.clone();
+        let mut rotated_piece = self.state.falling_piece.clone();
         rotate_counterclockwise(&mut rotated_piece);
 
-        if !self.are_valid_positions(&rotated_piece.tiles) {
+        if !are_valid_positions(&self.state.map, &rotated_piece.tiles) {
             if !self.kick_piece(&mut rotated_piece, 1) {
                 return;
             }
         }
 
-        erase_piece(&mut self.stdout, &self.falling_piece);
-        self.falling_piece = rotated_piece;
-        redraw_piece(&mut self.stdout, &self.falling_piece);
+        erase_piece(&mut self.stdout, &self.state.falling_piece);
+        self.state.falling_piece = rotated_piece;
+        redraw_piece(&mut self.stdout, &self.state.falling_piece);
     }
 
     fn kick_piece(&mut self, piece: &Piece, array_offset: usize) -> bool {
         let tests_index = piece.rotation_index * 2 + array_offset;
 
         match piece.bounding_box_size {
-            3 => self.kick_piece_with(SIZE_3_KICK_TESTS[tests_index]),
-            4 => self.kick_piece_with(SIZE_4_KICK_TESTS[tests_index]),
+            3 => kick_piece_with(&mut self.state, SIZE_3_KICK_TESTS[tests_index]),
+            4 => kick_piece_with(&mut self.state, SIZE_4_KICK_TESTS[tests_index]),
             _ => false
         }
     }
 
-    fn kick_piece_with(&mut self, test_delta_tiles: [Tile; 4]) -> bool {
-        for test_delta_tile in &test_delta_tiles {
-            let mut test_tiles = self.falling_piece.tiles.clone();
-            Game::<I, PTS>::move_tiles(&mut test_tiles, *test_delta_tile);
-
-            if self.are_valid_positions(&test_tiles) {
-                self.falling_piece.tiles = test_tiles;
-                self.falling_piece.origin += *test_delta_tile;
-                return true;
-            }
-        }
-
-        false
-    }
-
     fn move_piece(&mut self, delta: Tile) {
-        erase_piece(&mut self.stdout, &self.falling_piece);
+        erase_piece(&mut self.stdout, &self.state.falling_piece);
 
-        Game::<I, PTS>::move_tiles(&mut self.falling_piece.tiles, delta);
+        move_tiles(&mut self.state.falling_piece.tiles, delta);
 
-        self.falling_piece.origin = self.falling_piece.origin + delta;
-        redraw_piece(&mut self.stdout, &self.falling_piece);
-    }
-
-    fn move_tiles(tiles: &mut Vec<Tile>, delta: Tile) {
-        for tile in tiles {
-            *tile = *tile + delta;
-        }
-    }
-
-    fn are_valid_positions(&self, tiles: &Vec<Tile>) -> bool {
-        for tile in tiles {
-            if tile.y < 0 {
-                return false;
-            }
-
-            if tile.y >= HEIGHT as i16 {
-                return false;
-            }
-
-            if tile.x < 0 {
-                return false;
-            }
-
-            if tile.x >= WIDTH as i16 {
-                return false;
-            }
-
-            if self.map[*tile].is_set {
-                return false;
-            }
-        }
-
-        true
+        self.state.falling_piece.origin = self.state.falling_piece.origin + delta;
+        redraw_piece(&mut self.stdout, &self.state.falling_piece);
     }
 
     fn can_move_down(&self) -> bool {
-        for tile in &self.falling_piece.tiles {
+        for tile in &self.state.falling_piece.tiles {
             if tile.y == HEIGHT as i16 - 1 {
                 return false;
             }
 
-            if self.map[*tile + Tile::new(0, 1)].is_set {
+            if self.state.map[*tile + Tile::new(0, 1)].is_set {
                 return false;
             }
         }
@@ -332,6 +258,35 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
         }
     }
 }
+
+fn can_move_left(state: &mut GameState) -> bool {
+    for tile in &state.falling_piece.tiles {
+        if tile.x == 0 {
+            return false;
+        }
+
+        if state.map[*tile + Tile::new(-1, 0)].is_set {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn can_move_right(state: &mut GameState) -> bool {
+    for tile in &state.falling_piece.tiles {
+        if tile.x + 1 >= WIDTH as i16 {
+            return false;
+        }
+
+        if state.map[*tile + Tile::new(1, 0)].is_set {
+            return false;
+        }
+    }
+
+    true
+}
+
 fn rotate_clockwise(piece: &mut Piece) {
     for tile in &mut piece.tiles {
         let delta_from_origin = *tile - piece.origin;
@@ -352,3 +307,49 @@ fn rotate_counterclockwise(piece: &mut Piece) {
     piece.rotation_index = (piece.rotation_index + 3) % 4;
 }
 
+fn are_valid_positions(map: &Map, tiles: &Vec<Tile>) -> bool {
+    for tile in tiles {
+        if tile.y < 0 {
+            return false;
+        }
+
+        if tile.y >= HEIGHT as i16 {
+            return false;
+        }
+
+        if tile.x < 0 {
+            return false;
+        }
+
+        if tile.x >= WIDTH as i16 {
+            return false;
+        }
+
+        if map[*tile].is_set {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn kick_piece_with(state: &mut GameState, test_delta_tiles: [Tile; 4]) -> bool {
+    for test_delta_tile in &test_delta_tiles {
+        let mut test_tiles = state.falling_piece.tiles.clone();
+        move_tiles(&mut test_tiles, *test_delta_tile);
+
+        if are_valid_positions(&state.map, &test_tiles) {
+            state.falling_piece.tiles = test_tiles;
+            state.falling_piece.origin += *test_delta_tile;
+            return true;
+        }
+    }
+
+    false
+}
+
+fn move_tiles(tiles: &mut Vec<Tile>, delta: Tile) {
+    for tile in tiles {
+        *tile = *tile + delta;
+    }
+}
