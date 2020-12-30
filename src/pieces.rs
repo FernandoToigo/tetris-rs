@@ -1,5 +1,4 @@
 use crate::tiles::*;
-use crate::game::*;
 use rand::seq::SliceRandom;
 
 #[derive(Clone)]
@@ -116,25 +115,16 @@ pub static ALL_PIECES: [PieceType; 7] = [
         3)
 ];
 
-pub fn create_piece() -> Piece {
-    let piece_type = get_random_piece_type();
-    let mut tiles = piece_type.tiles.to_vec();
-    let start_x = WIDTH as i16 / 2 - (piece_type.bounding_box_size as f32 / 2f32).ceil() as i16;
-
-    for tile in &mut tiles {
-        tile.x += start_x;
-    }
-
-    Piece {
-        tiles,
-        origin: piece_type.origin + Tile::new(start_x, 0),
-        bounding_box_size: piece_type.bounding_box_size,
-        rotation_index: 0,
-    }
+pub trait PieceTypeSelector {
+    fn select_piece_type<'a>(&self, available_piece_types: &'a[PieceType; 7]) -> &'a PieceType;
 }
 
-fn get_random_piece_type() -> &'static PieceType {
-    let mut rng = rand::thread_rng();
-    ALL_PIECES.choose(&mut rng).unwrap()
+pub struct RandomPieceTypeSelector {}
+
+impl PieceTypeSelector for RandomPieceTypeSelector {
+    fn select_piece_type<'a>(&self, available_piece_types: &'a[PieceType; 7]) -> &'a PieceType {
+        let mut rng = rand::thread_rng();
+        available_piece_types.choose(&mut rng).unwrap()
+    }
 }
 

@@ -1,8 +1,6 @@
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
 use std::time::Duration;
 
-pub struct CrosstermInput {}
-
 pub enum InputResult {
     MoveLeft,
     MoveRight,
@@ -15,6 +13,8 @@ pub enum InputResult {
 pub trait InputSource {
     fn read_input(&self) -> Option<InputResult>;
 }
+
+pub struct CrosstermInput {}
 
 impl InputSource for CrosstermInput {
     fn read_input(&self) -> Option<InputResult> {
