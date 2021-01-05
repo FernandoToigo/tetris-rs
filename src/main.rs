@@ -183,7 +183,7 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
         rotate_clockwise(&mut rotated_piece);
 
         if !are_valid_positions(&self.state.map, &rotated_piece.tiles) {
-            if !self.kick_piece(&rotated_piece, 0) {
+            if !self.kick_piece(&mut rotated_piece, 0) {
                 return;
             }
         }
@@ -208,12 +208,12 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
         redraw_piece(&mut self.stdout, &self.state.falling_piece);
     }
 
-    fn kick_piece(&mut self, piece: &Piece, array_offset: usize) -> bool {
+    fn kick_piece(&mut self, piece: &mut Piece, array_offset: usize) -> bool {
         let tests_index = piece.rotation_index * 2 + array_offset;
-
+        
         match piece.bounding_box_size {
-            3 => kick_piece_with(&mut self.state, SIZE_3_KICK_TESTS[tests_index]),
-            4 => kick_piece_with(&mut self.state, SIZE_4_KICK_TESTS[tests_index]),
+            3 => kick_piece_with(&mut self.state, piece, SIZE_3_KICK_TESTS[tests_index]),
+            4 => kick_piece_with(&mut self.state, piece, SIZE_4_KICK_TESTS[tests_index]),
             _ => false
         }
     }
@@ -333,14 +333,14 @@ fn are_valid_positions(map: &Map, tiles: &Vec<Tile>) -> bool {
     true
 }
 
-fn kick_piece_with(state: &mut GameState, test_delta_tiles: [Tile; 4]) -> bool {
+fn kick_piece_with(state: &mut GameState, piece: &mut Piece, test_delta_tiles: [Tile; 4]) -> bool {
     for test_delta_tile in &test_delta_tiles {
-        let mut test_tiles = state.falling_piece.tiles.clone();
+        let mut test_tiles = piece.tiles.clone();
         move_tiles(&mut test_tiles, *test_delta_tile);
 
         if are_valid_positions(&state.map, &test_tiles) {
-            state.falling_piece.tiles = test_tiles;
-            state.falling_piece.origin += *test_delta_tile;
+            piece.tiles = test_tiles;
+            piece.origin += *test_delta_tile;
             return true;
         }
     }
