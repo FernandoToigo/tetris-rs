@@ -17,7 +17,10 @@ use input::*;
 
 fn main() {
     loop {
-        if !play(CrosstermInput {}, RandomPieceTypeSelector {}) {
+        let mut game = Game::new(
+            CrosstermInput {}, 
+            RandomPieceTypeSelector {});
+        if !game.run_frame() {
             break;
         }
     }
@@ -26,34 +29,8 @@ fn main() {
 // render
 // time
 
-fn play<I: InputSource, PTS: PieceTypeSelector>(input: I, piece_type_selector: PTS) -> bool {
-    let mut game = Game::initialize_game(input, piece_type_selector);
-    draw_bounds(&mut game.stdout).unwrap();
-    draw_tiles(&mut game.stdout, &game.state.map).unwrap();
-    redraw_piece(&mut game.stdout, &game.state.falling_piece);
-    flush(&mut game.stdout);
-
-    loop {
-        if game.read_input() {
-            return false;
-        }
-
-        if game.ended {
-            return true;
-        }
-
-        game.apply_gravity();
-
-        if game.ended {
-            return true;
-        }
-
-        flush(&mut game.stdout);
-    }
-}
-
 impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
-    pub fn initialize_game(input: I, piece_type_selector: PTS) -> Game<I, PTS> {
+    pub fn new(input: I, piece_type_selector: PTS) -> Game<I, PTS> {
         Game {
             state: GameState {
                 map: Game::<I, PTS>::initialize_map(),
@@ -64,6 +41,31 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
             ended: false,
             input,
             piece_type_selector
+        }
+    }
+
+    fn run_frame(&mut self) -> bool {
+        draw_bounds(&mut self.stdout).unwrap();
+        draw_tiles(&mut self.stdout, &self.state.map).unwrap();
+        redraw_piece(&mut self.stdout, &self.state.falling_piece);
+        flush(&mut self.stdout);
+
+        loop {
+            if self.read_input() {
+                return false;
+            }
+
+            if self.ended {
+                return true;
+            }
+
+            self.apply_gravity();
+
+            if self.ended {
+                return true;
+            }
+
+            flush(&mut self.stdout);
         }
     }
 
