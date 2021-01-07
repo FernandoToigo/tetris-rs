@@ -2,24 +2,25 @@ mod tiles;
 mod pieces;
 mod game;
 mod drawing;
+mod input;
+mod time;
 #[cfg(test)]
 mod tests;
-mod input;
 
-use std::time::Duration;
-use std::time::Instant;
 use std::io::stdout;
 use tiles::*;
 use pieces::*;
 use game::*;
 use drawing::*;
 use input::*;
+use crate::time::{ClockInstant, Clock, StdClock};
 
 fn main() {
     loop {
         let mut game = Game::new(
             CrosstermInput {}, 
-            RandomPieceTypeSelector {});
+            RandomPieceTypeSelector {},
+        StdClock {});
         if !game.run_frame() {
             break;
         }
@@ -29,14 +30,15 @@ fn main() {
 // render
 // time
 
-impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
-    pub fn new(input: I, piece_type_selector: PTS) -> Game<I, PTS> {
+impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> Game<I, PTS, TCI, TC> {
+    pub fn new(input: I, piece_type_selector: PTS, clock: TC) -> Game<I, PTS, TCI, TC> {
         Game {
             state: GameState {
-                map: Game::<I, PTS>::initialize_map(),
-                falling_piece: Game::<I, PTS>::create_piece(&piece_type_selector),
+                map: Game::<I, PTS, TCI, TC>::initialize_map(),
+                falling_piece: Game::<I, PTS, TCI, TC>::create_piece(&piece_type_selector),
             },
-            last_move_instant: Instant::now(),
+            clock,
+            last_move_instant: TC::now(),
             stdout: stdout(),
             ended: false,
             input,
@@ -123,7 +125,7 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
     }
 
     fn apply_gravity(&mut self) {
-        if self.last_move_instant.elapsed() > Duration::from_millis(1000) {
+        if self.last_move_instant.difference_millis(&TC::now()) > 1000 {
             self.fall_piece();
         }
     }
@@ -136,20 +138,20 @@ impl<I: InputSource, PTS: PieceTypeSelector> Game<I, PTS> {
 
             self.clear_complete_lines();
 
-            self.state.falling_piece = Game::<I, PTS>::create_piece(&self.piece_type_selector);
+            self.state.falling_piece = Game::<I, PTS, TCI, TC>::create_piece(&self.piece_type_selector);
             if !are_valid_positions(&self.state.map, &self.state.falling_piece.tiles) {
                 self.ended = true;
                 return;
             }
 
-            self.last_move_instant = Instant::now();
+            self.last_move_instant = TC::now();
             draw_tiles(&mut self.stdout, &self.state.map).unwrap();
             redraw_piece(&mut self.stdout, &self.state.falling_piece);
             return;
         }
 
         self.move_piece(Tile::new(0, 1));
-        self.last_move_instant = Instant::now();
+        self.last_move_instant = TC::now();
     }
 
     fn clear_complete_lines(&mut self) {

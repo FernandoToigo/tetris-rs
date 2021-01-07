@@ -1,7 +1,7 @@
 use crate::tiles::*;
 use crate::pieces::*;
 use crate::input::*;
-use std::time::Instant;
+use crate::time::*;
 use std::ops::Index;
 use std::io::Stdout;
 
@@ -14,9 +14,10 @@ pub struct MapTile {
     pub is_set: bool,
 }
 
-pub struct Game<TInput: InputSource, TPTS: PieceTypeSelector> {
+pub struct Game<TInput: InputSource, TPTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> {
     pub state: GameState,
-    pub last_move_instant: Instant,
+    pub clock: TC,
+    pub last_move_instant: TCI,
     pub ended: bool,
     pub input: TInput,
     pub piece_type_selector: TPTS,
