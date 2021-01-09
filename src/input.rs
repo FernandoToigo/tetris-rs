@@ -71,4 +71,10 @@ fn convert_input() -> Option<InputResult> {
     }
 }
 
+pub struct ManualInput {}
 
+impl InputSource for ManualInput {
+    fn read_input(&self) -> Option<InputResult> {
+        None
+    }
+}

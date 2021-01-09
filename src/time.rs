@@ -8,7 +8,7 @@ pub struct StdInstant {
 }
 
 impl Clock<StdInstant> for StdClock {
-    fn now() -> StdInstant {
+    fn now(&self) -> StdInstant {
         StdInstant {
             instant: Instant::now()
         }
@@ -22,9 +22,29 @@ impl ClockInstant for StdInstant {
 }
 
 pub trait Clock<T: ClockInstant> {
-    fn now() -> T;
+    fn now(&self) -> T;
 }
 
 pub trait ClockInstant {
     fn difference_millis(&self, other_instant: &Self) -> u128;
+}
+
+pub struct ManualClock {
+    pub now_milliseconds: u128
+}
+
+impl Clock<ManualClockInstant> for ManualClock {
+    fn now(&self) -> ManualClockInstant {
+        ManualClockInstant { milliseconds: self.now_milliseconds }
+    }
+}
+
+pub struct ManualClockInstant {
+    milliseconds: u128
+}
+
+impl ClockInstant for ManualClockInstant {
+    fn difference_millis(&self, other_instant: &Self) -> u128 {
+        other_instant.milliseconds - self.milliseconds
+    }
 }

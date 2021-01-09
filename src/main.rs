@@ -18,12 +18,12 @@ use crate::time::{ClockInstant, Clock, StdClock};
 fn main() {
     loop {
         let mut game = Game::new(
-            CrosstermInput {}, 
+            CrosstermInput {},
             RandomPieceTypeSelector {},
-        StdClock {});
-        if !game.run_frame() {
-            break;
-        }
+            StdClock {});
+        
+        game.initialize_drawing();
+        while !game.run_frame() {}
     }
 }
 
@@ -32,43 +32,45 @@ fn main() {
 
 impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> Game<I, PTS, TCI, TC> {
     pub fn new(input: I, piece_type_selector: PTS, clock: TC) -> Game<I, PTS, TCI, TC> {
+        let now = clock.now();
         Game {
             state: GameState {
                 map: Game::<I, PTS, TCI, TC>::initialize_map(),
                 falling_piece: Game::<I, PTS, TCI, TC>::create_piece(&piece_type_selector),
             },
             clock,
-            last_move_instant: TC::now(),
+            last_move_instant: now,
             stdout: stdout(),
             ended: false,
             input,
-            piece_type_selector
+            piece_type_selector,
         }
     }
 
     fn run_frame(&mut self) -> bool {
+        if self.read_input() {
+            return false;
+        }
+
+        if self.ended {
+            return true;
+        }
+
+        self.apply_gravity();
+
+        if self.ended {
+            return true;
+        }
+
+        flush(&mut self.stdout);
+        false
+    }
+
+    fn initialize_drawing(&mut self) {
         draw_bounds(&mut self.stdout).unwrap();
         draw_tiles(&mut self.stdout, &self.state.map).unwrap();
         redraw_piece(&mut self.stdout, &self.state.falling_piece);
         flush(&mut self.stdout);
-
-        loop {
-            if self.read_input() {
-                return false;
-            }
-
-            if self.ended {
-                return true;
-            }
-
-            self.apply_gravity();
-
-            if self.ended {
-                return true;
-            }
-
-            flush(&mut self.stdout);
-        }
     }
 
     fn initialize_map() -> Map {
@@ -125,7 +127,7 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
     }
 
     fn apply_gravity(&mut self) {
-        if self.last_move_instant.difference_millis(&TC::now()) > 1000 {
+        if self.last_move_instant.difference_millis(&self.clock.now()) > 1000 {
             self.fall_piece();
         }
     }
@@ -144,14 +146,14 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
                 return;
             }
 
-            self.last_move_instant = TC::now();
+            self.last_move_instant = self.clock.now();
             draw_tiles(&mut self.stdout, &self.state.map).unwrap();
             redraw_piece(&mut self.stdout, &self.state.falling_piece);
             return;
         }
 
         self.move_piece(Tile::new(0, 1));
-        self.last_move_instant = TC::now();
+        self.last_move_instant = self.clock.now();
     }
 
     fn clear_complete_lines(&mut self) {
@@ -214,7 +216,7 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
 
     fn kick_piece(&mut self, piece: &mut Piece, array_offset: usize) -> bool {
         let tests_index = piece.rotation_index * 2 + array_offset;
-        
+
         match piece.bounding_box_size {
             3 => kick_piece_with(&mut self.state, piece, SIZE_3_KICK_TESTS[tests_index]),
             4 => kick_piece_with(&mut self.state, piece, SIZE_4_KICK_TESTS[tests_index]),
@@ -244,7 +246,7 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
 
         true
     }
-    
+
     pub fn create_piece(piece_type_selector: &PTS) -> Piece {
         let piece_type = piece_type_selector.select_piece_type(&ALL_PIECES);
         let mut tiles = piece_type.tiles.to_vec();

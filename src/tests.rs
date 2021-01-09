@@ -1,4 +1,6 @@
 use super::*;
+use std::time::Instant;
+use crate::time::ManualClock;
 
 #[test]
 fn rotate_clockwise_plank_piece() {
@@ -67,3 +69,24 @@ fn rotate_counterclockwise_l_piece() {
     assert_eq!(piece.tiles[2], Tile::new(6, 4));
     assert_eq!(piece.tiles[3], Tile::new(7, 4));
 }
+
+#[test]
+fn run_simple_game() {
+    let mut game = Game::new(
+        ManualInput {},
+        RandomPieceTypeSelector {},
+        ManualClock {
+            now_milliseconds: 0
+        });
+    game.initialize_drawing();
+
+    let instant = Instant::now();
+    while !game.run_frame() {
+        game.clock.now_milliseconds = instant.elapsed().as_millis() * 100;
+        
+        if game.clock.now_milliseconds > 1_000_000 {
+            assert!(false)
+        }
+    }
+}
+
