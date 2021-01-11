@@ -3,7 +3,7 @@ use crate::pieces::*;
 use crate::input::*;
 use crate::time::*;
 use std::ops::Index;
-use std::io::Stdout;
+use crate::drawing::Drawing;
 
 pub const WIDTH: u16 = 10;
 pub const HEIGHT: u16 = 20;
@@ -14,14 +14,14 @@ pub struct MapTile {
     pub is_set: bool,
 }
 
-pub struct Game<TInput: InputSource, TPTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> {
+pub struct Game<TInput: InputSource, TPTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>, TD: Drawing> {
     pub state: GameState,
     pub clock: TC,
     pub last_move_instant: TCI,
     pub ended: bool,
     pub input: TInput,
     pub piece_type_selector: TPTS,
-    pub stdout: Stdout
+    pub drawing: TD
 }
 
 pub struct GameState {

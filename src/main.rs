@@ -20,30 +20,29 @@ fn main() {
         let mut game = Game::new(
             CrosstermInput {},
             RandomPieceTypeSelector {},
-            StdClock {});
+            StdClock {},
+        StdoutDrawing { stdout: stdout() });
         
-        game.initialize_drawing();
+        game.drawing.init();
+        
         while !game.run_frame() {}
     }
 }
 
-// render
-// time
-
-impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> Game<I, PTS, TCI, TC> {
-    pub fn new(input: I, piece_type_selector: PTS, clock: TC) -> Game<I, PTS, TCI, TC> {
+impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>, TD: Drawing> Game<I, PTS, TCI, TC, TD> {
+    pub fn new(input: I, piece_type_selector: PTS, clock: TC, drawing: TD) -> Game<I, PTS, TCI, TC, TD> {
         let now = clock.now();
         Game {
             state: GameState {
-                map: Game::<I, PTS, TCI, TC>::initialize_map(),
-                falling_piece: Game::<I, PTS, TCI, TC>::create_piece(&piece_type_selector),
+                map: Game::<I, PTS, TCI, TC, TD>::initialize_map(),
+                falling_piece: Game::<I, PTS, TCI, TC, TD>::create_piece(&piece_type_selector),
             },
             clock,
             last_move_instant: now,
-            stdout: stdout(),
             ended: false,
             input,
             piece_type_selector,
+            drawing
         }
     }
 
@@ -62,15 +61,8 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
             return true;
         }
 
-        flush(&mut self.stdout);
+        self.drawing.draw(&self.state);
         false
-    }
-
-    fn initialize_drawing(&mut self) {
-        draw_bounds(&mut self.stdout).unwrap();
-        draw_tiles(&mut self.stdout, &self.state.map).unwrap();
-        redraw_piece(&mut self.stdout, &self.state.falling_piece);
-        flush(&mut self.stdout);
     }
 
     fn initialize_map() -> Map {
@@ -140,15 +132,13 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
 
             self.clear_complete_lines();
 
-            self.state.falling_piece = Game::<I, PTS, TCI, TC>::create_piece(&self.piece_type_selector);
+            self.state.falling_piece = Game::<I, PTS, TCI, TC, TD>::create_piece(&self.piece_type_selector);
             if !are_valid_positions(&self.state.map, &self.state.falling_piece.tiles) {
                 self.ended = true;
                 return;
             }
 
             self.last_move_instant = self.clock.now();
-            draw_tiles(&mut self.stdout, &self.state.map).unwrap();
-            redraw_piece(&mut self.stdout, &self.state.falling_piece);
             return;
         }
 
@@ -194,9 +184,7 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
             }
         }
 
-        erase_piece(&mut self.stdout, &self.state.falling_piece);
         self.state.falling_piece = rotated_piece;
-        redraw_piece(&mut self.stdout, &self.state.falling_piece);
     }
 
     fn try_rotate_counterclockwise(&mut self) {
@@ -209,9 +197,7 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
             }
         }
 
-        erase_piece(&mut self.stdout, &self.state.falling_piece);
         self.state.falling_piece = rotated_piece;
-        redraw_piece(&mut self.stdout, &self.state.falling_piece);
     }
 
     fn kick_piece(&mut self, piece: &mut Piece, array_offset: usize) -> bool {
@@ -225,12 +211,8 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>> 
     }
 
     fn move_piece(&mut self, delta: Tile) {
-        erase_piece(&mut self.stdout, &self.state.falling_piece);
-
         move_tiles(&mut self.state.falling_piece.tiles, delta);
-
         self.state.falling_piece.origin = self.state.falling_piece.origin + delta;
-        redraw_piece(&mut self.stdout, &self.state.falling_piece);
     }
 
     fn can_move_down(&self) -> bool {

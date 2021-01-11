@@ -77,16 +77,18 @@ fn run_simple_game() {
         RandomPieceTypeSelector {},
         ManualClock {
             now_milliseconds: 0
+        }, 
+        StdoutDrawing{
+            stdout: stdout()
         });
-    game.initialize_drawing();
+    game.drawing.init();
 
     let instant = Instant::now();
     while !game.run_frame() {
-        game.clock.now_milliseconds = instant.elapsed().as_millis() * 100;
+        let elapsed_millis = instant.elapsed().as_millis();
+        game.clock.now_milliseconds = elapsed_millis * 100;
         
-        if game.clock.now_milliseconds > 1_000_000 {
-            assert!(false)
-        }
+        assert!(elapsed_millis < 10_000)
     }
 }
 
