@@ -91,3 +91,14 @@ impl Drawing for StdoutDrawing {
         self.flush();
     }
 }
+
+pub struct NoopDrawing {
+}
+
+impl Drawing for NoopDrawing {
+    fn init(&mut self) {
+    }
+
+    fn draw(&mut self, _: &GameState) {
+    }
+}

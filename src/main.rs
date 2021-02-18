@@ -25,7 +25,10 @@ fn main() {
         
         game.drawing.init();
         
-        while !game.run_frame() {}
+        match game.play_until_finished() {
+            FrameResult::GameQuitRequested => break,
+            _ => continue
+        }
     }
 }
 
@@ -45,24 +48,33 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>, 
             drawing
         }
     }
+    
+    fn play_until_finished(&mut self) -> FrameResult {
+        loop {
+            match self.run_frame() {
+                FrameResult::GameInProgress => continue,
+                a => return a
+            }
+        }
+    }
 
-    fn run_frame(&mut self) -> bool {
+    fn run_frame(&mut self) -> FrameResult {
         if self.read_input() {
-            return false;
+            return FrameResult::GameQuitRequested;
         }
 
         if self.ended {
-            return true;
+            return FrameResult::PlayerLost;
         }
 
         self.apply_gravity();
 
         if self.ended {
-            return true;
+            return FrameResult::PlayerLost;
         }
 
         self.drawing.draw(&self.state);
-        false
+        FrameResult::GameInProgress
     }
 
     fn initialize_map() -> Map {
@@ -84,25 +96,19 @@ impl<I: InputSource, PTS: PieceTypeSelector, TCI: ClockInstant, TC: Clock<TCI>, 
     }
 
     fn read_input(&mut self) -> bool {
-        let input_read = self.input.read_input();
-        match input_read.as_ref() {
-            Some(input) => match input {
-                InputResult::MoveLeft => self.move_left(),
-                InputResult::MoveRight => self.move_right(),
-                InputResult::MoveDown => self.fall_piece(),
-                InputResult::RotateClockwise => self.try_rotate_clockwise(),
-                InputResult::RotateCounterClockwise => self.try_rotate_counterclockwise(),
-                _ => {}
-            },
-            None => {}
-        }
-
-        match input_read.as_ref() {
-            Some(input) => match input {
-                InputResult::ExitGame => true,
-                _ => false
-            },
-            None => false
+        loop {
+            let input_read = self.input.read_input();
+            match input_read.as_ref() {
+                Some(input) => match input {
+                    InputResult::MoveLeft => self.move_left(),
+                    InputResult::MoveRight => self.move_right(),
+                    InputResult::MoveDown => self.fall_piece(),
+                    InputResult::RotateClockwise => self.try_rotate_clockwise(),
+                    InputResult::RotateCounterClockwise => self.try_rotate_counterclockwise(),
+                    InputResult::ExitGame => return true,
+                },
+                None => return false
+            }
         }
     }
 

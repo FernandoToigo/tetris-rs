@@ -51,10 +51,10 @@ pub static ALL_PIECES: [PieceType; 7] = [
     //Plank
     PieceType::new(
         [
-            Tile::new(0, 0),
-            Tile::new(1, 0),
-            Tile::new(2, 0),
-            Tile::new(3, 0),
+            Tile::new(0, 1),
+            Tile::new(1, 1),
+            Tile::new(2, 1),
+            Tile::new(3, 1),
         ],
         Tile::new(0, -1),
         4),
@@ -128,3 +128,12 @@ impl PieceTypeSelector for RandomPieceTypeSelector {
     }
 }
 
+pub struct ManualPieceTypeSelector {
+    pub piece_index: usize
+}
+
+impl PieceTypeSelector for ManualPieceTypeSelector {
+    fn select_piece_type<'a>(&self, available_piece_types: &'a [PieceType; 7]) -> &'a PieceType {
+        &available_piece_types[self.piece_index]
+    }
+}

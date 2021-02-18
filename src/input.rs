@@ -1,6 +1,7 @@
 use crossterm::event::{poll, read, Event, KeyCode, KeyEvent};
 use std::time::Duration;
 
+#[derive(Copy, Clone)]
 pub enum InputResult {
     MoveLeft,
     MoveRight,
@@ -11,13 +12,13 @@ pub enum InputResult {
 }
 
 pub trait InputSource {
-    fn read_input(&self) -> Option<InputResult>;
+    fn read_input(&mut self) -> Option<InputResult>;
 }
 
 pub struct CrosstermInput {}
 
 impl InputSource for CrosstermInput {
-    fn read_input(&self) -> Option<InputResult> {
+    fn read_input(&mut self) -> Option<InputResult> {
         match poll(Duration::from_secs(0)) {
             Ok(has_input) => {
                 match has_input {
@@ -71,10 +72,12 @@ fn convert_input() -> Option<InputResult> {
     }
 }
 
-pub struct ManualInput {}
+pub struct ManualInput<F> where F: FnMut() -> Option<InputResult> {
+    pub next_input_func: F
+}
 
-impl InputSource for ManualInput {
-    fn read_input(&self) -> Option<InputResult> {
-        None
+impl<F> InputSource for ManualInput<F> where F: FnMut() -> Option<InputResult> {
+    fn read_input(&mut self) -> Option<InputResult> {
+        (self.next_input_func)()
     }
 }

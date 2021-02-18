@@ -40,3 +40,9 @@ impl Index<Tile> for Map {
     }
 }
 
+#[derive(PartialEq, Eq, Debug)]
+pub enum FrameResult {
+    GameInProgress,
+    PlayerLost,
+    GameQuitRequested
+}
